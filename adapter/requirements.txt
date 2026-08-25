@@ -1,0 +1,8 @@
+fastapi>=0.118,<1.0
+uvicorn[standard]>=0.34,<1.0
+httpx>=0.28,<1.0
+# Used only by the optional on-demand illustration generator (AV's reused
+# generate_one.py / pregen.py: chroma cutout + Gemini render). Small enough to
+# always include; generation stays off unless GENERATE_ENABLED + GEMINI_API_KEY.
+pillow>=10,<12
+numpy>=1.26,<3

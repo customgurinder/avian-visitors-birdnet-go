@@ -1,0 +1,20 @@
+# local secrets / config
+.env
+.claude/settings.local.json
+
+# bind-mount data dir (frontend + illustrations + generated art; not source)
+/data/
+# also ignore a few common alternative data-dir names
+/avian-data/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# os
+.DS_Store
+
+# scratch
+*.log

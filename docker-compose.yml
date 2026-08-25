@@ -1,0 +1,77 @@
+name: avian-visitors-birdnet-go
+
+# ---------------------------------------------------------------------------
+# Avian Visitors visualization for an external BirdNET-Go instance.
+# Deploys three PRE-BUILT images (no build step on the host) — paste this into
+# Portainer's Stack web editor, or run `docker compose up -d`.
+#
+# The images are published to GHCR by .github/workflows/build-images.yml when
+# you push this repo to GitHub. Set IMAGE_BASE to your registry path (e.g.
+# ghcr.io/<you>/avian-visitors-birdnet-go) and IMAGE_TAG (default latest).
+#
+# Required: BIRDNETGO_URL (your BirdNET-Go) and DATA_DIR (an absolute host path
+# for all data — bind-mounted, NAS-friendly). See README + .env.example.
+#
+# STORAGE: everything lives under DATA_DIR. Point it at your NAS to persist +
+# back up (incl. Gemini-generated art) across rebuilds. No bird data is stored
+# here (detections stay in BirdNET-Go); it is safe to back up or delete.
+# ---------------------------------------------------------------------------
+
+services:
+  installer:
+    image: ${IMAGE_BASE:-ghcr.io/your-github-user/avian-visitors-birdnet-go}-installer:${IMAGE_TAG:-latest}
+    environment:
+      PACKS: ${PACKS:-}
+      INCLUDE_BASE_PACK: ${INCLUDE_BASE_PACK:-false}
+      AV_REPO: ${AV_REPO:-https://github.com/Twarner491/AvianVisitors.git}
+      AV_REF: ${AV_REF:-avian-visitors}
+      FORCE_FRONTEND: ${FORCE_FRONTEND:-false}
+      FORCE_PACKS: ${FORCE_PACKS:-false}
+      GENERATE_ENABLED: ${GENERATE_ENABLED:-false}
+      ADAPTER_UID: ${ADAPTER_UID:-10001}
+    volumes:
+      - ${DATA_DIR:-./data}:/data
+    restart: "no"
+
+  adapter:
+    image: ${IMAGE_BASE:-ghcr.io/your-github-user/avian-visitors-birdnet-go}-adapter:${IMAGE_TAG:-latest}
+    environment:
+      BIRDNETGO_URL: ${BIRDNETGO_URL:-}
+      BIRDNETGO_SCHEME: ${BIRDNETGO_SCHEME:-http}
+      BIRDNETGO_HOST: ${BIRDNETGO_HOST:-}
+      BIRDNETGO_PORT: ${BIRDNETGO_PORT:-8080}
+      BIRDNETGO_API_TOKEN: ${BIRDNETGO_API_TOKEN:-}
+      HTTP_TIMEOUT: ${HTTP_TIMEOUT:-10}
+      CACHE_TTL: ${CACHE_TTL:-30}
+      MAX_DETECTIONS: ${MAX_DETECTIONS:-5000}
+      CALENDAR_MAX_DAYS: ${CALENDAR_MAX_DAYS:-365}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ASSETS_DIR: /data/assets/illustrations
+      TZ: ${TZ:-UTC}
+      ADAPTER_PORT: ${ADAPTER_PORT:-9000}
+      GENERATE_ENABLED: ${GENERATE_ENABLED:-false}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GENERATE_HOURLY_CAP: ${GENERATE_HOURLY_CAP:-6}
+    volumes:
+      - ${DATA_DIR:-./data}:/data
+    depends_on:
+      installer:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    image: ${IMAGE_BASE:-ghcr.io/your-github-user/avian-visitors-birdnet-go}-web:${IMAGE_TAG:-latest}
+    environment:
+      ADAPTER_HOST: adapter
+      ADAPTER_PORT: ${ADAPTER_PORT:-9000}
+      TZ: ${TZ:-UTC}
+    ports:
+      - "${WEB_PORT:-8090}:80"
+    volumes:
+      - ${DATA_DIR:-./data}:/data:ro
+    depends_on:
+      adapter:
+        condition: service_started
+      installer:
+        condition: service_completed_successfully
+    restart: unless-stopped

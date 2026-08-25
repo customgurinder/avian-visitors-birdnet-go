@@ -1,0 +1,77 @@
+name: Build and publish images
+
+# Builds the three images (adapter, installer, web) and pushes them to the
+# GitHub Container Registry (GHCR) as multi-arch (amd64 + arm64, so they run on
+# a NAS/PC or a Raspberry Pi). After the first successful run the images exist
+# at:
+#   ghcr.io/<owner>/avian-visitors-birdnet-go-adapter
+#   ghcr.io/<owner>/avian-visitors-birdnet-go-installer
+#   ghcr.io/<owner>/avian-visitors-birdnet-go-web
+#
+# Then deploy with docker-compose.images.yml (see README "Deploy from
+# pre-built images") — no build context or repo checkout needed on the host,
+# so you can paste that compose straight into Portainer.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: adapter
+            context: ./adapter
+          - service: installer
+            context: ./installer
+          - service: web
+            context: ./web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lowercase owner
+        id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ steps.owner.outputs.name }}/avian-visitors-birdnet-go-${{ matrix.service }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,format=short
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

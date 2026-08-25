@@ -1,0 +1,41 @@
+# Serves the Avian Visitors static frontend from the shared volume and proxies
+# the /avian/api/* endpoints (and media) to the adapter. Variables ADAPTER_HOST
+# and ADAPTER_PORT are substituted from the environment at container start
+# (nginx official image /etc/nginx/templates mechanism). nginx's own runtime
+# variables ($host, $uri, …) are not in the environment, so they are preserved.
+
+server {
+    listen 80;
+    server_name _;
+
+    root /data/site;
+    index index.html;
+
+    # generated collage tables live in the volume; keep them fresh-ish
+    location = /dims.json  { add_header Cache-Control "public, max-age=300"; try_files $uri =404; }
+    location = /masks.json { add_header Cache-Control "public, max-age=300"; try_files $uri =404; }
+
+    # Resolve the adapter hostname at request time via Docker's embedded DNS
+    # (127.0.0.11). Using a variable in proxy_pass forces runtime resolution,
+    # so nginx starts even if the adapter is briefly down and picks up its new
+    # IP after a restart — instead of crashing at startup on an unknown host.
+    resolver 127.0.0.11 ipv6=off valid=30s;
+
+    # API + media -> adapter. $request_uri preserves the full original path.
+    location /avian/api/ {
+        set $adapter_upstream http://${ADAPTER_HOST}:${ADAPTER_PORT};
+        proxy_pass $adapter_upstream$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;            # stream audio/spectrogram without buffering
+        proxy_read_timeout 120s;
+    }
+
+    # static frontend
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
