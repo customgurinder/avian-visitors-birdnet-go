@@ -282,12 +282,22 @@ AV_ADAPTER_USER=568:568
 `web` intentionally stays root (nginx binds port 80). Read-only serving (the
 default) works with this alone.
 
+The one-shot **installer** runs as root by default (`AV_INSTALLER_USER=0:0`) so
+it can write the data dir and set ownership on any host. On a NAS you can
+instead run it as the dataset's owner so the files it installs are owned by that
+user natively:
+
+```env
+AV_INSTALLER_USER=568:568
+```
+
 If you **enable generation**, note it runs *inside the adapter* (the adapter
 spawns the generator as its own user; the installer only stages the scripts).
 So the writable dirs must be owned by the adapter's UID: set `AV_ADAPTER_UID`
 to the same value as `AV_ADAPTER_USER`'s UID — e.g. `AV_ADAPTER_UID=568` — and
-the installer will `chown` them to match. On shares where `chown` is restricted,
-make `$AV_DATA_DIR` writable by that UID out-of-band.
+the installer will `chown` them to match (when it runs as root; when it runs as
+that same non-root user the files are already owned correctly). On shares where
+`chown` is restricted, make `$AV_DATA_DIR` writable by that UID out-of-band.
 
 ---
 
