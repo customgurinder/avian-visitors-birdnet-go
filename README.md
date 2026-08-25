@@ -34,21 +34,89 @@ through BirdNET-Go's own UI.
 
 ## Prerequisites
 
-- A **standalone Docker** host (not Swarm) running Portainer.
-- A **GitHub account** (the included CI builds and publishes the images).
-- A running BirdNET-Go instance reachable over HTTP from the Docker host.
+- A Docker host with **Docker Compose v2** (`docker compose`). Standalone Docker,
+  not Swarm.
+- A running **BirdNET-Go** instance reachable over HTTP from that host.
+- The images published to a registry — see [Publishing the images](#publishing-the-images).
+  (One-time; you can make them public so any host just pulls them.)
 
-## Deploying on Portainer (pre-built images)
+## Deploy (Docker Compose)
 
-The three images are built and published to GHCR by GitHub Actions, then pulled
-by your Portainer stack — nothing is built on the Docker host.
+On your Docker host:
 
-### 1. Publish the images
+```bash
+git clone https://github.com/<owner>/avian-visitors-birdnet-go.git
+cd avian-visitors-birdnet-go
+cp .env.example .env
+nano .env          # set AV_IMAGE_BASE, AV_BIRDNETGO_URL, AV_DATA_DIR (absolute), AV_PACKS, TZ
 
-Push this repo to GitHub. The workflow
-[`.github/workflows/build-images.yml`](.github/workflows/build-images.yml) runs
-on push to `main` (or a `v*` tag, or manually via **Actions → Run workflow**)
-and publishes three multi-arch (amd64 + arm64) images to GHCR:
+docker compose up -d
+```
+
+Then open **`http://<host>:8090`** (or your `AV_WEB_PORT`).
+
+Minimum you must set in `.env`:
+
+| Variable | Example | Notes |
+|----------|---------|-------|
+| `AV_IMAGE_BASE` | `ghcr.io/<owner>/avian-visitors-birdnet-go` | Where the images live (lowercase owner). |
+| `AV_BIRDNETGO_URL` | `http://192.168.1.50:8080` | Your BirdNET-Go, reachable from the host. |
+| `AV_DATA_DIR` | `/srv/avian-visitors` | **Absolute host path** for all data (see [Storage](#storage)). |
+| `AV_PACKS` | `https://github.com/lloydalexporter/AvianAssets_GB-ENG.git` | Illustration pack(s). |
+| `TZ` | `Europe/London` | Correct "today" boundaries. |
+
+Full list in [.env.example](.env.example) and [Configuration](#configuration).
+
+**What happens on first `up`:** the one-shot `installer` runs first — it fetches
+the Avian Visitors frontend, downloads your illustration pack(s), and builds the
+collage tables into `AV_DATA_DIR` (a few minutes; ~1,400 files for GB-ENG). Then
+`adapter` and `web` start. Later `up`s are instant — the installer skips the
+heavy work once the data dir is populated. (`installer` ending in `Exited (0)`
+is expected; it's a job, not a service.)
+
+If your images are **private**, log in on the host first so Compose can pull:
+
+```bash
+echo <GHCR_PAT> | docker login ghcr.io -u <github-user> --password-stdin
+```
+
+### Everyday operations
+
+```bash
+docker compose logs -f adapter          # follow adapter logs
+docker compose pull && docker compose up -d   # update to newer images
+docker compose down                     # stop (AV_DATA_DIR is a bind mount → your data stays)
+```
+
+**Add or change illustration packs:** edit `AV_PACKS` in `.env`, then force one
+refresh (the installer otherwise skips the pack download once populated):
+
+```bash
+AV_FORCE_PACKS=true docker compose up -d
+```
+
+`AV_FORCE_FRONTEND=true` likewise re-fetches the AV frontend (e.g. after an AV
+upgrade).
+
+## Deploy with Portainer (optional)
+
+Prefer a UI? It's the same compose file:
+
+- **Stacks → Add stack → Web editor**, paste [`docker-compose.yml`](docker-compose.yml),
+  add the environment variables from the table above (Portainer's env fields
+  replace the `.env` file), and **Deploy**.
+- Use an **absolute `AV_DATA_DIR`** — a relative path lands inside Portainer's
+  internal stack folder, not where you want it.
+- Private images: **Registries → Add registry → Custom**, `ghcr.io`, your GitHub
+  user + a `read:packages` PAT.
+- Update via the stack's **Pull and redeploy**.
+
+## Publishing the images
+
+The images are built and pushed to GHCR by GitHub Actions —
+[`.github/workflows/build-images.yml`](.github/workflows/build-images.yml) — on
+every push to `main` (also on `v*` tags, or manually via **Actions → Run
+workflow**). It produces three **multi-arch (amd64 + arm64)** images:
 
 ```
 ghcr.io/<owner>/avian-visitors-birdnet-go-adapter
@@ -56,59 +124,16 @@ ghcr.io/<owner>/avian-visitors-birdnet-go-installer
 ghcr.io/<owner>/avian-visitors-birdnet-go-web
 ```
 
-First run takes ~5–10 min (arm64 is emulated). `<owner>` is your GitHub
-username/org, lowercased.
+Push this repo to GitHub and the first build runs automatically (~5–10 min; arm64
+is emulated). A **private repo is fine** — its GHCR packages start private, so
+either set each package **Public** (GitHub → package → *Package settings →
+Change visibility*; the repo can stay private) so any host pulls without auth, or
+keep them private and `docker login ghcr.io` / add a Portainer registry
+credential. `<owner>` is your GitHub username/org, lowercased.
 
-### 2. Make the packages pullable
-
-A **private repo is fine** — but its GHCR packages default to private, so choose one:
-
-- **Public packages** (simplest): GitHub → each of the 3 packages → *Package
-  settings → Change visibility → Public*. The repo itself can stay private.
-- **Keep them private**: in Portainer, **Registries → Add registry → Custom**,
-  URL `ghcr.io`, username = your GitHub user, password = a PAT with
-  `read:packages`. Portainer then pulls them with those creds.
-
-### 3. Deploy the stack
-
-In Portainer: **Stacks → Add stack → Web editor**, paste
-[`docker-compose.yml`](docker-compose.yml), and set environment variables:
-
-| Name | Example | Notes |
-|------|---------|-------|
-| `AV_IMAGE_BASE` | `ghcr.io/<owner>/avian-visitors-birdnet-go` | Your GHCR path (lowercase owner). |
-| `AV_IMAGE_TAG` | `latest` | Or a specific tag. |
-| `AV_BIRDNETGO_URL` | `http://192.168.1.50:8080` | **Required.** Reachable from the Docker host. |
-| `AV_DATA_DIR` | `/volume1/docker/avian-visitors` | **Absolute host path** for all data — otherwise it lands in Portainer's internal stack folder. See [Storage](#storage). |
-| `AV_WEB_PORT` | `8090` | Host port for the UI. |
-| `TZ` | `Europe/London` | Correct day boundaries. |
-| `AV_PACKS` | `https://github.com/lloydalexporter/AvianAssets_GB-ENG.git` | Illustration pack(s). |
-| `AV_INCLUDE_BASE_PACK` | `false` | Also add AV's base pack. |
-| `AV_BIRDNETGO_API_TOKEN` | *(blank)* | Only if your API needs auth. |
-
-**Deploy**, then open `http://<docker-host>:<AV_WEB_PORT>`. The one-shot `installer`
-runs first (fetches the AV frontend, downloads your packs, builds the collage
-tables into `AV_DATA_DIR` — a few minutes for ~1,400 GB-ENG files), then `adapter`
-and `web` start. Redeploys are fast (the installer skips the heavy work once the
-data dir is populated).
-
-### Portainer notes
-
-- The **`installer` shows `Exited (0)`** — normal; it's a one-shot that populates
-  the data dir and quits. `adapter` + `web` keep running.
-- **BirdNET-Go reachability:** `localhost` won't work from inside a container.
-  Use the host's LAN IP, or attach the stack to BirdNET-Go's Docker network and
-  use `http://birdnet-go:8080` (see [Networking](#networking)).
-- **Updating:** push to GitHub → CI rebuilds → in Portainer use **Pull and
-  redeploy** on the stack.
-- **Adding/refreshing packs:** change `AV_PACKS`, set **`AV_FORCE_PACKS=true`** for one
-  redeploy, then remove it. Once the data dir is populated the installer skips
-  the pack download + mask rebuild, so this flag is what forces a refresh
-  (`AV_FORCE_FRONTEND=true` likewise refreshes the AV frontend).
-
-> Building locally instead of via CI isn't part of this setup, but the
-> Dockerfiles are still here — `docker build ./adapter` (and `./installer`,
-> `./web`) works if you ever need it.
+> No CI? The `Dockerfile`s are here too — `docker build ./adapter` (and
+> `./installer`, `./web`), tag them as `${AV_IMAGE_BASE}-<service>`, and push to any
+> registry you like.
 
 ---
 
@@ -317,9 +342,9 @@ AV_GEMINI_API_KEY=your-key      # https://aistudio.google.com/apikey (billing re
 # AV_GENERATE_HOURLY_CAP=6      # cost brake (default 6)
 ```
 
-then redeploy the stack (Portainer **Pull and redeploy**, or `docker compose up
--d`). The installer stages the generation scripts + style references into the
-data dir; the adapter spawns them
+then redeploy (`docker compose up -d`, or Portainer **Pull and redeploy**). The
+installer stages the generation scripts + style references into the data dir;
+the adapter spawns them
 on demand and reports progress to the modal. Generated art is chroma-cut (no
 heavy ML models) and saved into your illustration set, so it persists.
 
@@ -358,14 +383,16 @@ Upstream responses are cached for `AV_CACHE_TTL` seconds.
 
 ## Operating
 
+Day-to-day commands (logs, update, stop) are under
+[Everyday operations](#everyday-operations). Quick health checks:
+
 ```bash
-docker compose logs -f adapter        # adapter logs (set AV_LOG_LEVEL=DEBUG for detail)
-docker compose ps                     # service status
-curl "http://localhost:8090/avian/api/birdnet-api.php?action=stats"   # smoke test
+curl "http://localhost:8090/avian/api/birdnet-api.php?action=stats"   # data smoke test
+docker compose logs adapter | tail            # set AV_LOG_LEVEL=DEBUG in .env for detail
 ```
 
-The adapter exposes `/healthz` (liveness) and `/readyz` (checks BirdNET-Go is
-reachable) on its internal port.
+The adapter also exposes `/healthz` (liveness) and `/readyz` (checks BirdNET-Go
+is reachable) on its internal port.
 
 ### Troubleshooting
 
