@@ -42,6 +42,12 @@ services:
 
   adapter:
     image: ${AV_IMAGE_BASE:-ghcr.io/your-github-user/avian-visitors-birdnet-go}-adapter:${AV_IMAGE_TAG:-latest}
+    # Runtime user. Defaults to the image's non-root user (10001). On a NAS
+    # whose data dataset is owned by a specific user (e.g. TrueNAS apps = 568),
+    # set AV_ADAPTER_USER=568:568 so the (still non-root) adapter can read/write
+    # the bind-mounted data. If you also enable generation, set AV_ADAPTER_UID
+    # to the same uid so the installer chowns the writable dirs to match.
+    user: "${AV_ADAPTER_USER:-10001:10001}"
     environment:
       BIRDNETGO_URL: ${AV_BIRDNETGO_URL:-}
       BIRDNETGO_SCHEME: ${AV_BIRDNETGO_SCHEME:-http}

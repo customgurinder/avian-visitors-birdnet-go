@@ -269,12 +269,25 @@ in BirdNET-Go. So this folder is safe to back up or delete; the installer
 rebuilds everything except Gemini-generated art (which is why keeping it on your
 NAS matters). Typical size ~600 MB with the GB-ENG pack.
 
-**Permissions note:** the adapter runs as UID `10001`. When generation is
-enabled, the installer `chown`s the writable dirs to that UID. On a local disk
-this just works; on some NAS shares `chown` is restricted — if generation can't
-write, make `$AV_DATA_DIR` writable by UID 10001, set `AV_ADAPTER_UID` to your share's
-owner, or run the adapter as that user. Read-only serving (the default) works
-regardless.
+**Permissions note:** the adapter runs, by default, as the image's non-root
+user (UID `10001`). On a local disk this just works. On a NAS whose data
+dataset is owned by a specific user (e.g. TrueNAS's `apps` user, UID `568`),
+UID 10001 usually can't read the bind-mounted data — set `AV_ADAPTER_USER` to
+the dataset's owner so the (still non-root) adapter matches it:
+
+```env
+AV_ADAPTER_USER=568:568
+```
+
+`web` intentionally stays root (nginx binds port 80). Read-only serving (the
+default) works with this alone.
+
+If you **enable generation**, note it runs *inside the adapter* (the adapter
+spawns the generator as its own user; the installer only stages the scripts).
+So the writable dirs must be owned by the adapter's UID: set `AV_ADAPTER_UID`
+to the same value as `AV_ADAPTER_USER`'s UID — e.g. `AV_ADAPTER_UID=568` — and
+the installer will `chown` them to match. On shares where `chown` is restricted,
+make `$AV_DATA_DIR` writable by that UID out-of-band.
 
 ---
 
