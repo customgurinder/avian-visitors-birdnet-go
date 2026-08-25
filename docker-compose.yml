@@ -27,6 +27,12 @@ name: avian-visitors-birdnet-go
 services:
   installer:
     image: ${AV_IMAGE_BASE:-ghcr.io/your-github-user/avian-visitors-birdnet-go}-installer:${AV_IMAGE_TAG:-latest}
+    # Runtime user. Defaults to root (0:0) so it can write the bind-mounted data
+    # dir and chown the generation dirs regardless of host ownership — the
+    # portable default. On a NAS you can instead run it as the dataset's owner
+    # (e.g. AV_INSTALLER_USER=568:568) so installed files are owned by that user
+    # natively; the chown step then no-ops and falls back to chmod if needed.
+    user: "${AV_INSTALLER_USER:-0:0}"
     environment:
       PACKS: ${AV_PACKS:-}
       INCLUDE_BASE_PACK: ${AV_INCLUDE_BASE_PACK:-false}
@@ -42,6 +48,12 @@ services:
 
   adapter:
     image: ${AV_IMAGE_BASE:-ghcr.io/your-github-user/avian-visitors-birdnet-go}-adapter:${AV_IMAGE_TAG:-latest}
+    # Runtime user. Defaults to the image's non-root user (10001). On a NAS
+    # whose data dataset is owned by a specific user (e.g. TrueNAS apps = 568),
+    # set AV_ADAPTER_USER=568:568 so the (still non-root) adapter can read/write
+    # the bind-mounted data. If you also enable generation, set AV_ADAPTER_UID
+    # to the same uid so the installer chowns the writable dirs to match.
+    user: "${AV_ADAPTER_USER:-10001:10001}"
     environment:
       BIRDNETGO_URL: ${AV_BIRDNETGO_URL:-}
       BIRDNETGO_SCHEME: ${AV_BIRDNETGO_SCHEME:-http}
