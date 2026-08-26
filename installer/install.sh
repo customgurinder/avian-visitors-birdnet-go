@@ -30,6 +30,7 @@ FORCE_FRONTEND="${FORCE_FRONTEND:-false}"
 FORCE_PACKS="${FORCE_PACKS:-false}"
 GENERATE_ENABLED="${GENERATE_ENABLED:-false}"
 ADAPTER_UID="${ADAPTER_UID:-10001}"
+SITE_TITLE="${SITE_TITLE:-Avian Visitors}"
 GEN="$DATA/gen"
 
 log() { printf '[installer] %s\n' "$*"; }
@@ -132,6 +133,13 @@ fi
 if [ -f /usr/local/bin/patch_theme_toggle.py ] && [ -f "$SITE/index.html" ]; then
   log "Adding theme toggle to index.html"
   python3 /usr/local/bin/patch_theme_toggle.py "$SITE/index.html" || true
+fi
+
+# Set the browser-tab title (upstream ships "your birds"). Instant, idempotent
+# edit; SITE_TITLE controls the value (default "Avian Visitors").
+if [ -f /usr/local/bin/patch_title.py ] && [ -f "$SITE/index.html" ]; then
+  log "Setting browser-tab title to '$SITE_TITLE'"
+  SITE_TITLE="$SITE_TITLE" python3 /usr/local/bin/patch_title.py "$SITE/index.html" || true
 fi
 
 # --------------------------------------------------------------------------
