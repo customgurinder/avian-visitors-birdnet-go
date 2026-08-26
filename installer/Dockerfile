@@ -9,7 +9,8 @@ RUN pip install --no-cache-dir Pillow==11.0.0
 COPY install.sh /usr/local/bin/install.sh
 COPY patch_stamps.py /usr/local/bin/patch_stamps.py
 COPY patch_theme_toggle.py /usr/local/bin/patch_theme_toggle.py
-RUN chmod +x /usr/local/bin/install.sh /usr/local/bin/patch_stamps.py /usr/local/bin/patch_theme_toggle.py
+COPY patch_title.py /usr/local/bin/patch_title.py
+RUN chmod +x /usr/local/bin/install.sh /usr/local/bin/patch_stamps.py /usr/local/bin/patch_theme_toggle.py /usr/local/bin/patch_title.py
 
 # git needs a home dir / safe.directory tolerance under arbitrary UIDs
 ENV GIT_TERMINAL_PROMPT=0
