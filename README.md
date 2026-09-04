@@ -81,7 +81,8 @@ collage tables into `AV_DATA_DIR` (a few minutes; ~1,400 files for GB-ENG). Then
 heavy work once the data dir is populated. (`installer` ending in `Exited (0)`
 is expected; it's a job, not a service.)
 
-If your images are **private**, log in on the host first so Compose can pull:
+The images are published **public**, so any host can pull them with no login.
+(If you keep them private instead, log in on the host first so Compose can pull:)
 
 ```bash
 echo <GHCR_PAT> | docker login ghcr.io -u <github-user> --password-stdin
@@ -132,11 +133,12 @@ ghcr.io/<owner>/avian-visitors-birdnet-go-web
 ```
 
 Push this repo to GitHub and the first build runs automatically (~5–10 min; arm64
-is emulated). A **private repo is fine** — its GHCR packages start private, so
-either set each package **Public** (GitHub → package → *Package settings →
-Change visibility*; the repo can stay private) so any host pulls without auth, or
-keep them private and `docker login ghcr.io` / add a Portainer registry
-credential. `<owner>` is your GitHub username/org, lowercased.
+is emulated). GHCR packages start **private** even for a public repo, so after
+the first build set each package **Public** (GitHub → package → *Package settings
+→ Change visibility → Public*) so any host pulls without a login — that's the
+setup these instructions assume. Prefer to keep them private? Leave them as-is
+and `docker login ghcr.io` on the host / add a Portainer registry credential.
+`<owner>` is your GitHub username/org, lowercased.
 
 > No CI? The `Dockerfile`s are here too — `docker build ./adapter` (and
 > `./installer`, `./web`), tag them as `${AV_IMAGE_BASE}-<service>`, and push to any
