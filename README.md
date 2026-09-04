@@ -4,6 +4,13 @@ Run the [Avian Visitors](https://github.com/Twarner491/AvianVisitors) bird
 collage and stats UI on top of an existing **[BirdNET-Go](https://github.com/tphakala/birdnet-go)**
 instance — no BirdNET-Pi required.
 
+> **Built on the [Avian Visitors](https://github.com/Twarner491/AvianVisitors) project by Tim Warner.**
+> All the UI, design, and visualizations are theirs — this project simply
+> **adapts** Avian Visitors to run against **BirdNET-Go** instead of BirdNET-Pi.
+> I built it because I already run BirdNET-Go and wanted its collage and stats
+> without switching stacks. The Avian Visitors frontend is used **unmodified**;
+> if you enjoy this, please star and support the [upstream project](https://github.com/Twarner491/AvianVisitors).
+
 Avian Visitors is normally an overlay on BirdNET-Pi: its frontend talks to a
 small PHP API that reads BirdNET-Pi's `birds.db`. This project replaces that
 PHP layer with a lightweight **adapter** that speaks the exact same contract
